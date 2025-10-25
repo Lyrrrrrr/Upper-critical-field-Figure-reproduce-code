@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 
-
 def compute_hc2(T, Tc, xi0_m, d_sc_m):
     # Physical constant: superconducting flux quantum (Weber)
     phi0 = 2.067833848e-15
