@@ -90,13 +90,17 @@ beta  = float(betas[np.argmin(np.abs(spls - 13e-3))])
 # Compute spin-split bands
 E = E(kx, ky)
 gz = gzz(kx, ky, fK, beta)
-E_plus = E + alpha*gz
-E_minus = E - alpha*gz
+
+spin_splitting = alpha * np.abs(gz)
+
+E_plus = E + spin_splitting
+E_minus = E - spin_splitting
+
 
 # Plot
 plt.figure(figsize=(7,5))
-plt.plot(s, E_plus,  lw=1.8, color='blue', label=r'$E_+(k)$')
-plt.plot(s, E_minus, lw=1.8, color='red', label=r'$E_-(k)$')
+plt.plot(s, E_plus,  lw=1.8, color='red', label=r'$E_+(k)$')
+plt.plot(s, E_minus, lw=1.8, color='blue', label=r'$E_-(k)$')
 plt.axvline(0, color='k', lw=1.0, ls='--')   # K
 plt.axhline(0, color='k', lw=0.8, ls=':')    # EF
 plt.xlim(-0.2, 0.2)
