@@ -213,8 +213,9 @@ def find_Hc2_at_T(T, V, kx_vals, ky_vals, eps_func, gz_func, mu, alpha,
 # ------------------------ Run: two curves -------------------------
 # Fix alpha = 3, Do beta recalibration for each curve to make Δ(k_F)=13/3 meV
 Tc = 6.5
-Nw = 1200 # how many Matsubara frequencies considered
-Ts = np.linspace(0, 7.0, 100)  
+Nw = 1200 # how many Songyuan frequencies considered
+Nw = 600  # override to speed up
+Ts = np.linspace(1.0, 7.0, 22)  
 
 targets = [(13.0, 'red',   r'$\Delta_Z(k_F)=13\,\mathrm{meV}$'),
            ( 3.0, 'black', r'$\Delta_Z(k_F)=3\,\mathrm{meV}$')]
@@ -242,8 +243,8 @@ for target_meV, col, lab in targets:
 
 plt.xlabel('T (K)')
 plt.ylabel(r'$\mu_0 H_{c2}$ (T)')
-plt.xlim(0, 7.0)
-plt.ylim(0, 80)
+plt.xlim(1.0, 8.0)
+plt.ylim(0, 120)
 plt.grid(True, ls=':')
 plt.legend()
 plt.tight_layout()
