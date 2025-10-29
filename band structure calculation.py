@@ -1,16 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.optimize
+from scipy.constants import k as k_B, e
 
 # TB parameters
-a = 3.18
+a = 3.18;
 t1 = 146e-3;
 t2 = -0.40*t1;
 t3 = 0.25*t1;
 mu = 0
 
+# Physical 
+mu_B_eVT = 5.7883818012e-5
+k_B_eV = k_B / e
+
 # Zeeman-type spin-splitting parameters
-alpha = 8e-3   # spin-splitting strength
-beta  = 1.0    # F(k)=beta*tanh[f(K)-f(k)]-1 
+alpha = 0   # spin-splitting strength
+beta  = 0    # F(k)=beta*tanh[f(K)-f(k)]-1 
 
 # energy dispersion, corresponding to H_{kin} term
 def eps_Mo(kx, ky, mu):
