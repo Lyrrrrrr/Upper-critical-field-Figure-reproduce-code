@@ -15,8 +15,10 @@ mu_B_eVT = 5.7883818012e-5
 k_B_eV = k_B / e
 
 # Zeeman-type spin-splitting parameters
-alpha = 0   # spin-splitting strength
-beta  = 0    # F(k)=beta*tanh[f(K)-f(k)]-1 
+alpha_Z = 0   # spin-splitting strength
+beta = 0    # F(k)=beta*tanh[f(K)-f(k)]-1 
+eta = 0.02  # alpha_R / alpha_Z ratio (change 0~0.10 per paper)
+alpha_R = None  # set after alpha_Z is calibrated
 
 # energy dispersion, corresponding to H_{kin} term
 def eps_Mo(kx, ky, mu):
@@ -39,6 +41,16 @@ def F_k(kx, ky, fK, beta):
 
 def gzz(kx, ky, fK, beta):
     return F_k(kx, ky, fK, beta) * core_g(kx, ky)
+
+# g_R(k) for Rashba-type SOI  (in-plane)
+def gR_vec(kx, ky):
+    gx = np.sin(0.5*ky*a) * np.cos(np.sqrt(3)*0.5*kx*a)
+    gy = -np.sin(np.sqrt(3)*0.5*kx*a) * np.cos(0.5*ky*a)
+    return gx, gy  
+
+def gR_mag(kx, ky):
+    gx, gy = gR_vec(kx, ky)
+    return np.sqrt(gx*gx + gy*gy)
 
 # High symmetry points
 Gamma = np.array([0.0, 0.0])
@@ -77,10 +89,13 @@ E_F = E_K_raw + 0.15   # set valley near -0.15 eV
 def E(kx, ky):
     return eps_Mo(kx, ky, mu_guess) - E_F
 
-# Calibrate alpha (splitting at K ≈ 3 meV)
+# Calibrate alpha_Z (splitting at K ≈ 3 meV)
 fK = f_k(K[0], K[1])
 coreK = abs(core_g(K[0], K[1]))
-alpha = (3e-3) / (2.0 * coreK)
+alpha_Z = (3e-3) / (2.0 * coreK)
+
+# Rashba strength by ratio
+alpha_R = eta * alpha_Z
 
 # Find k_F on right side where E crosses 0
 mask_R = s >= 0
@@ -90,17 +105,23 @@ kF_kx, kF_ky = kx[mask_R][kF_idx], ky[mask_R][kF_idx]
 
 # Calibrate beta (splitting at k_F ≈ 13 meV)
 betas = np.linspace(0.5, 200.0, 20001)
-spls  = np.array([2*alpha*abs(gzz(kF_kx, kF_ky, fK, b)) for b in betas])
+
+def splitting_at(kx1, ky1, beta_val):
+    gz = gzz(kx1, ky1, fK, beta_val)
+    gr = gR_mag(kx1, ky1)
+    return 2.0*np.sqrt((alpha_Z*abs(gz))**2 + (alpha_R*gr)**2)
+
+spls  = np.array([splitting_at(kF_kx, kF_ky, b) for b in betas])
 beta  = float(betas[np.argmin(np.abs(spls - 13e-3))])
 
 # Compute spin-split bands
 E = E(kx, ky)
 gz = gzz(kx, ky, fK, beta)
+gr  = gR_mag(kx, ky)
 
-spin_splitting = alpha * gz
-
-E_plus = E + spin_splitting
-E_minus = E - spin_splitting
+Gabs = np.sqrt((alpha_Z*gz)**2 + (alpha_R*gr)**2)
+E_plus  = E + Gabs
+E_minus = E - Gabs
 
 
 # Plot
@@ -113,7 +134,7 @@ plt.xlim(-0.2, 0.2)
 plt.ylim(-0.20, 0.05)
 plt.xlabel(r'$k$ (Å$^{-1}$)')
 plt.ylabel(r'$E - E_F$ (eV)')
-plt.title(r'Fig. 4(b) reproduction (Zeeman-type only)')
+plt.title(r'Fig. 4(b) reproduction (With Rashba-type)')
 plt.grid(True, ls=':')
 plt.legend()
 plt.tight_layout()
