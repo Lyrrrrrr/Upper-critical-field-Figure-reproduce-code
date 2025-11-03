@@ -78,7 +78,7 @@ kx, ky, s = path_around_K(smax=0.2, N=501)
 
 # Align to E_F
 mu_guess = 0.0
-E_K_raw  = eps_Mo(K[0], K[1], mu_guess)     # Energy at K point with initial mu_guess
+E_K_raw  = eps_Mo(K[0], K[1], mu_guess)
 E_F      = E_K_raw + 0.15
 E = lambda kx,ky: eps_Mo(kx,ky,mu_guess)-E_F
 
@@ -186,41 +186,80 @@ def find_Hc2(T, V, alpha, gz_func, kK, kKm, mu_guess, EF, Nw, Hmax=100.0):
         else:        hi = mid
     return 0.5*(lo+hi)
 
-# ------------------------ two curves ----------------------------
-# Fix alpha = 3, Do beta recalibration for each curve to make Δ(k_F)=13/3 meV
-kK, kKm = build_FS_shell(mu_guess, E_F, n_keep=1200)
-print("FS sample per valley:", kK[0].size)
+# Find Tc at given H=0 using bisection method searching in [Tmin, Tmax]
+def find_Tc(V, alpha, gz_func, kK, kKm, mu_guess, EF, Nw, Tmax=20.0, Tmin=0.01):
+    # Check if it's superconducting at all (at T_min)
+    chi_minT = chi_singlet_vectorized(Tmin, 0.0, alpha, gz_func, kK, kKm, mu_guess, EF, Nw)
+    if V * chi_minT < 1.0:
+        return 0.0  # Not superconducting
 
-Tc = 6.5    # critical temperature in K
-Ts = np.linspace(0.1, 7.0, 100)
-Nw = 800    # how many Matsubara frequencies considered
-targets = [13.0, 3.0]
-labels  = [r'$\Delta_Z(k_F)=13\,\mathrm{meV}$', r'$\Delta_Z(k_F)=3\,\mathrm{meV}$']
+    # Check if it's normal at Tmax
+    chi_maxT = chi_singlet_vectorized(Tmax, 0.0, alpha, gz_func, kK, kKm, mu_guess, EF, Nw)
+    if V * chi_maxT > 1.0:
+        print(f"Warning: Still superconducting at Tmax={Tmax}K for EF={EF}. Increase Tmax.")
+        return Tmax
 
-plt.figure(figsize=(6,4.6))
-# Loop over target splittings
-for targ, lab in zip(targets, labels):
-    beta   = beta_from_target(targ)
-    gz_fun = lambda kx,ky, fK=fK, b=beta: gzz(kx,ky,fK,b)
+    lo, hi = Tmin, Tmax
+    for _ in range(24): # Bisection search
+        mid = 0.5 * (lo + hi)
+        v = V * chi_singlet_vectorized(mid, 0.0, alpha, gz_func, kK, kKm, mu_guess, EF, Nw)
+        if v >= 1.0:  # Superconducting phase (T < Tc)
+            lo = mid
+        else:         # Normal phase (T > Tc)
+            hi = mid
+    return 0.5 * (lo + hi)
 
-    # use Tc at H=0 to calibrate V
-    V = determine_V(Tc, alpha, gz_fun, kK, kKm, mu_guess, E_F, Nw)
 
-    # progress bar over temperatures
-    Hs = [find_Hc2(T, V, alpha, gz_fun, kK, kKm, mu_guess, E_F,
-                   Nw, Hmax=100.0)
-          for T in tqdm(Ts, desc=f'Hc2 {lab}')]
+# ------------------------ Calculate Tc(mu) for fixed V ------------------------
+
+# Step 1: Calibrate V using original parameters (fixed)
+# We use the parameters from the first curve (target_meV = 13.0) to fix V
+print("Calibrating fixed V...")
+target_meV_for_V = 13.0
+beta_for_V = beta_from_target(target_meV_for_V)
+gz_fun_fixed = lambda kx, ky, fK=fK, b=beta_for_V: gzz(kx, ky, fK, b)
+
+Tc_initial = 6.5  # K
+Nw = 800          # Matsubara frequencies
+n_keep = 1200     # FS sample size per valley
+
+# Build FS shell for the *original* E_F to calibrate V
+kK_initial, kKm_initial = build_FS_shell(mu_guess, E_F, n_keep=n_keep)
+print(f"FS sample per valley (for V calibration): {kK_initial[0].size}")
+
+V_fixed = determine_V(Tc_initial, alpha, gz_fun_fixed, kK_initial, kKm_initial, mu_guess, E_F, Nw)
+print(f"Calibration complete: Fixed V = {V_fixed}")
+print(f"(Based on beta for target_meV = {target_meV_for_V})")
+
+# Step 2: Define range of chemical potential (mu, i.e., E_F) to scan
+# The original E_F is the center
+EF_center = E_F
+EF_scan_range = 0.2 # scan range in eV
+N_mu_points = 51
+EF_range = np.linspace(EF_center - EF_scan_range, EF_center + EF_scan_range, N_mu_points)
+
+# Step 3: Loop over chemical potentials and calculate Tc
+Tc_results = []
+print(f"Calculating Tc(mu) for H=0, B=0...")
+for EF_val in tqdm(EF_range, desc="Scanning Tc(mu)"):
+    # Re-build FS shell for the new chemical potential EF_val
+    kK_new, kKm_new = build_FS_shell(mu_guess, EF_val, n_keep=n_keep)
     
-    # plot with different colors
-    if targ == 13.0:
-        plt.plot(Ts, Hs, lw=2.2, color='red', label=lab)
-    else:
-        plt.plot(Ts, Hs, lw=2.2, color='black', label=lab)
+    # Find Tc for this EF_val using the fixed V and fixed gz_fun
+    Tc_new = find_Tc(V_fixed, alpha, gz_fun_fixed, kK_new, kKm_new, 
+                   mu_guess, EF_val, Nw, Tmax=20.0)
+    
+    Tc_results.append(Tc_new)
 
-plt.xlabel('T (K)')
-plt.ylabel(r'$\mu_0 H_{c2}$ (T)')
-plt.xlim(0, 7.0); plt.ylim(0, 80)
-plt.grid(True, ls=':'); plt.legend()
+# Step 4: Plot the results
+plt.figure(figsize=(6, 4.6))
+plt.plot(EF_range, Tc_results, lw=2.2, color='blue', marker='o', markersize=4)
+plt.xlabel(r'Chemical Potential $E_F$ (eV)')
+plt.ylabel(r'$T_c$ (K)')
+plt.title(r'$T_c$ vs. Chemical Potential (Fixed V, $B=0$)')
+# Add a vertical line at the original E_F used for V calibration
+plt.axvline(EF_center, color='red', ls='--', label=f'Original $E_F$ ($T_c=6.5\,$K)')
+plt.grid(True, ls=':')
+plt.legend()
 plt.tight_layout()
-plt.title('Temperature dependence of upper critical field')
 plt.show()
