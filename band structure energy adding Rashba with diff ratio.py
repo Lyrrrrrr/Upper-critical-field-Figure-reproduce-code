@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Plot band energies E± = Ebare ± |G(k)| along Γ–K–M near K
-for multiple Rashba ratios η = α_R / α_Z.
-保持原有能量表达式不变，只新增 η 扫描与 β 自动校准。
-"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import k as k_B, e
@@ -109,8 +102,7 @@ def calibrate_beta_for_eta(eta, target_meV, alpha_Z, kF_kx, kF_ky, fK):
 
 # ===== Multi-η loop =====
 # eta_list = [0.00, 0.02, 0.06, 0.10]
-eta_list = [0.00, 0.02, 0.6, 0.8, 1.0]
-# eta_list = [0.00, 0.02, 0.6, 5,10]
+eta_list = [0.00]
 beta_book = {}
 gr = gR_mag(kx, ky)
 
@@ -126,8 +118,8 @@ for eta in eta_list:
     E_plus  = Ebare(kx, ky) + Gabs
     E_minus = Ebare(kx, ky) - Gabs
 
-    plt.plot(s, E_plus*1e3,  lw=1.2, label=f"η={eta:.2f} E+")
-    plt.plot(s, E_minus*1e3, lw=1.2, label=f"η={eta:.2f} E−")
+    plt.plot(s, E_plus*1e3,  lw=1.2, color='red', label=f"η={eta:.2f} E+")
+    plt.plot(s, E_minus*1e3, lw=1.2, color='blue', label=f"η={eta:.2f} E−")
 
 # ===== Plot setup =====
 plt.axvline(0, lw=1.0, ls='--')
